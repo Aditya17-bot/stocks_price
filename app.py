@@ -2,9 +2,18 @@ from flask import Flask, render_template, request, jsonify
 import yfinance as yf
 from datetime import datetime
 from flask_cors import CORS
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
+
+# Configure Flask app
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'fallback-secret-key')
+app.config['DEBUG'] = os.getenv('DEBUG', 'False').lower() == 'true'
 
 # Dictionary of Nifty 200 stocks grouped by sectors
 NIFTY200_STOCKS = {
@@ -422,4 +431,4 @@ def get_divergence_stocks():
         })
 
 if __name__ == '__main__':
-    app.run(debug=True) 
+    app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000))) 
