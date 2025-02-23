@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <title>Nifty 50 Stock Tracker</title>
+    <style>
+        :root {
+            --primary: #4f6fff;       /* Bright blue */
+            --primary-light: #6c85ff;
+            --secondary: #1e2137;     /* Dark blue-grey */
+            --accent: #00e676;        /* Bright green for positive */
+            --danger: #ff5252;        /* Bright red for negative */
+            --background: #0a1929;    /* Very dark blue */
+            --card-bg: #1a2332;       /* Dark blue-grey */
+            --text-primary: #ffffff;
+            --text-secondary: #a6b0cf;
+            --border-color: #2d364f;
+        }
+
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #0a1929 0%, #1a2332 100%);
+            min-height: 100vh;
+            color: var(--text-primary);
+        }
+
+        .container {
+            background-color: var(--card-bg);
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        h1 {
+            color: var(--primary);
+            margin-bottom: 30px;
+            font-size: 2em;
+        }
+
+        .sector-form {
+            margin-bottom: 25px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            padding-bottom: 5px;
+            justify-content: space-between;
+        }
+
+        .search-group {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex: 1;
+        }
+
+        select, .search-input {
+            padding: 12px 16px;
+            font-size: 15px;
+            width: 100%;
+            flex-shrink: 1;
+            border-radius: 8px;
+            border: 2px solid var(--border-color);
+            background-color: var(--secondary);
+            color: var(--text-primary);
+            transition: all 0.3s ease;
+        }
+
+        select:focus, .search-input:focus {
+            border-color: var(--primary);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(79, 111, 255, 0.2);
+        }
+
+        button {
+            padding: 12px 24px;
+            white-space: nowrap;
+            flex-shrink: 0;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            background-color: var(--primary-light);
+            transform: translateY(-1px);
+        }
+
+        .stock-card {
+            border: 1px solid var(--border-color);
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 12px;
+            background-color: var(--secondary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+        }
+
+        .stock-card:hover {
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+            transform: translateY(-2px);
+            border-color: var(--primary);
+        }
+
+        .stock-info {
+            flex: 1;
+            min-width: 300px;
+        }
+
+        .stock-info h3 {
+            margin: 0 0 10px 0;
+            color: var(--primary);
+            font-size: 1.2em;
+        }
+
+        .stock-details {
+            display: flex;
+            gap: 25px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .price-container {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .price {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .day-range {
+            font-size: 0.9em;
+            color: var(--text-secondary);
+        }
+
+        .positive-change {
+            color: var(--accent);
+            font-weight: 600;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background-color: rgba(0, 230, 118, 0.15);
+        }
+
+        .negative-change {
+            color: var(--danger);
+            font-weight: 600;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background-color: rgba(255, 82, 82, 0.15);
+        }
+
+        .volume {
+            color: var(--text-secondary);
+            font-size: 0.95em;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 30px;
+            font-size: 1.2em;
+            color: var(--text-secondary);
+            background-color: var(--secondary);
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .error {
+            color: var(--danger);
+            padding: 10px;
+            border-radius: 8px;
+            background-color: rgba(255, 82, 82, 0.15);
+        }
+
+        h2 {
+            color: var(--text-primary);
+            margin: 30px 0 20px 0;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        /* Add styles for option elements in select */
+        select option {
+            background-color: var(--secondary);
+            color: var(--text-primary);
+            padding: 8px;
+        }
+
+        .indices-header {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .index-card {
+            background-color: var(--secondary);
+            padding: 15px 20px;
+            border-radius: 8px;
+            flex: 1;
+            min-width: 250px;
+            border: 1px solid var(--border-color);
+        }
+
+        .index-card h3 {
+            margin: 0 0 10px 0;
+            color: var(--text-primary);
+        }
+
+        .index-price {
+            font-size: 1.4em;
+            font-weight: bold;
+            color: var(--text-primary);
+            margin-bottom: 5px;
+        }
+
+        .index-details {
+            font-size: 0.9em;
+            color: var(--text-secondary);
+        }
+
+        /* Add custom scrollbar for the form */
+        .sector-form::-webkit-scrollbar {
+            height: 4px;
+        }
+        
+        .sector-form::-webkit-scrollbar-track {
+            background: var(--secondary);
+            border-radius: 2px;
+        }
+        
+        .sector-form::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 2px;
+        }
+        
+        .sector-form::-webkit-scrollbar-thumb:hover {
+            background: var(--primary);
+        }
+
+        /* Add these new styles */
+        .header-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .filter-button {
+            background-color: var(--secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .filter-button:hover {
+            border-color: var(--primary);
+            background-color: var(--secondary);
+        }
+
+        .filter-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: none;
+            z-index: 1000;
+            overflow-y: auto;  /* Allow vertical scrolling */
+        }
+
+        .filter-content {
+            background-color: var(--card-bg);
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 25px;
+            border-radius: 12px;
+            position: relative;
+            margin-bottom: 40px;  /* Add space at the bottom */
+        }
+
+        .close-button {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 24px;
+            cursor: pointer;
+            padding: 5px;
+        }
+
+        .close-button:hover {
+            color: var(--text-primary);
+            transform: none;
+        }
+
+        .filter-form {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+            align-items: flex-end;
+        }
+
+        .filter-group {
+            flex: 1;
+        }
+
+        .filter-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-secondary);
+        }
+
+        .stock-details-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .stock-details-table th,
+        .stock-details-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .stock-details-table th {
+            color: var(--text-secondary);
+            font-weight: normal;
+        }
+
+        .stock-details-table td {
+            color: var(--text-primary);
+        }
+
+        /* Add these styles */
+        .suggestions-container {
+            position: relative;
+        }
+
+        .suggestions-list {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background-color: var(--secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-top: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+        }
+
+        .suggestion-item {
+            padding: 10px 15px;
+            cursor: pointer;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .suggestion-item:last-child {
+            border-bottom: none;
+        }
+
+        .suggestion-item:hover {
+            background-color: var(--card-bg);
+        }
+
+        .suggestion-symbol {
+            font-weight: bold;
+            color: var(--text-primary);
+        }
+
+        .suggestion-name {
+            font-size: 0.9em;
+            color: var(--text-secondary);
+        }
+
+        /* Update the filter form styles */
+        .filter-form {
+            position: relative;
+        }
+
+        /* Add custom scrollbar for suggestions */
+        .suggestions-list::-webkit-scrollbar {
+            width: 4px;
+        }
+        
+        .suggestions-list::-webkit-scrollbar-track {
+            background: var(--secondary);
+        }
+        
+        .suggestions-list::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 2px;
+        }
+
+        .divergence-button {
+            background-color: var(--accent);
+            margin-left: auto;  /* Push to right */
+        }
+
+        .divergence-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background-color: var(--secondary);
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .divergence-stats {
+            display: flex;
+            gap: 20px;
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.9em;
+        }
+
+        .stat-value {
+            color: var(--text-primary);
+            font-size: 1.1em;
+            font-weight: 500;
+        }
+
+        .header-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .filter-description {
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+
+        .filter-description ul {
+            margin-top: 10px;
+            padding-left: 20px;
+        }
+
+        .filter-description li {
+            margin: 5px 0;
+        }
+
+        /* Make buttons consistent width */
+        .sector-form button {
+            min-width: 120px;
+        }
+
+        .divergence-form {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            align-items: flex-end;
+            background-color: var(--secondary);
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .divergence-form .filter-group {
+            flex: 1;
+        }
+
+        .divergence-form input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background-color: var(--card-bg);
+            color: var(--text-primary);
+        }
+
+        .divergence-form input[type="number"]:focus {
+            border-color: var(--primary);
+            outline: none;
+        }
+
+        #divergenceResult {
+            max-height: none;  /* Remove any height restrictions */
+            overflow: visible;  /* Allow content to flow naturally */
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .stock-card {
+                padding: 15px;
+            }
+
+            .stock-info {
+                min-width: 100%;
+                margin-bottom: 10px;
+            }
+
+            .stock-details {
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            .sector-form {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .search-group {
+                width: 100%;
+            }
+
+            .indices-header {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header-container">
+            <h1>Nifty 50 Stock Tracker</h1>
+            <div class="header-buttons">
+                <button class="filter-button" onclick="showFilter()">
+                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M1.5 1.5A.5.5 0 0 1 2 1h12a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-.128.334L10 8.692V13.5a.5.5 0 0 1-.342.474l-3 1A.5.5 0 0 1 6 14.5V8.692L1.628 3.834A.5.5 0 0 1 1.5 3.5v-2z"/>
+                    </svg>
+                    Advanced Filter
+                </button>
+                <button class="filter-button" onclick="showDivergence()">
+                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M8 16a.5.5 0 0 1-.5-.5v-1.293l-.646.647a.5.5 0 0 1-.707-.708L7.5 12.793V8.866l-3.4 1.963-.496 1.85a.5.5 0 1 1-.966-.26l.237-.882-1.12.646a.5.5 0 0 1-.5-.866l1.12-.646-.884-.237a.5.5 0 1 1 .26-.966l1.848.495L7 8 3.6 6.037l-1.85.495a.5.5 0 0 1-.258-.966l.883-.237-1.12-.646a.5.5 0 1 1 .5-.866l1.12.646-.237-.883a.5.5 0 1 1 .966-.258l.495 1.849L7.5 7.134V3.207L6.147 1.854a.5.5 0 1 1 .707-.708l.646.647V.5a.5.5 0 1 1 1 0v1.293l.647-.647a.5.5 0 1 1 .707.708L8.5 3.207v3.927l3.4-1.963.496-1.85a.5.5 0 1 1 .966.26l-.236.882 1.12-.646a.5.5 0 0 1 .5.866l-1.12.646.883.237a.5.5 0 1 1-.26.966l-1.848-.495L9 8l3.4 1.963 1.849-.495a.5.5 0 0 1 .259.966l-.883.237 1.12.646a.5.5 0 0 1-.5.866l-1.12-.646.236.883a.5.5 0 1 1-.966.258l-.495-1.849-3.4-1.963v3.927l1.353 1.353a.5.5 0 0 1-.707.708l-.647-.647v1.293a.5.5 0 0 1-.5.5z"/>
+                    </svg>
+                    Trading Opportunities
+                </button>
+            </div>
+        </div>
+        <div id="filterScreen" class="filter-screen">
+            <div class="filter-content">
+                <button class="close-button" onclick="hideFilter()">&times;</button>
+                <h2>Advanced Stock Filter</h2>
+                <div class="filter-form">
+                    <div class="filter-group">
+                        <label for="filterStock">Stock Symbol</label>
+                        <div class="suggestions-container">
+                            <input type="text" 
+                                   id="filterStock" 
+                                   class="search-input" 
+                                   placeholder="Search stock by name or symbol"
+                                   oninput="showSuggestions(this, 'filterSuggestions')"
+                                   onkeypress="if(event.key === 'Enter') getDetailedStock()">
+                            <div id="filterSuggestions" class="suggestions-list" style="display: none;"></div>
+                        </div>
+                    </div>
+                    <button onclick="getDetailedStock()">Get Details</button>
+                </div>
+                <div id="filterResult"></div>
+            </div>
+        </div>
+        <div class="indices-header">
+            <div class="index-card">
+                <h3>NIFTY 50</h3>
+                {% if nifty_data %}
+                <div class="index-price">
+                    ₹{{ "%.2f"|format(nifty_data.price) }}
+                    <span class="{% if nifty_data.change >= 0 %}positive-change{% else %}negative-change{% endif %}">
+                        {{ "▲" if nifty_data.change >= 0 else "▼" }} {{ "%.2f"|format(nifty_data.change|abs) }}%
+                    </span>
+                </div>
+                <div class="index-details">
+                    H: ₹{{ "%.2f"|format(nifty_data.high) }} | L: ₹{{ "%.2f"|format(nifty_data.low) }}
+                </div>
+                {% else %}
+                <div class="error">Unable to fetch data</div>
+                {% endif %}
+            </div>
+            <div class="index-card">
+                <h3>BANK NIFTY</h3>
+                {% if bank_data %}
+                <div class="index-price">
+                    ₹{{ "%.2f"|format(bank_data.price) }}
+                    <span class="{% if bank_data.change >= 0 %}positive-change{% else %}negative-change{% endif %}">
+                        {{ "▲" if bank_data.change >= 0 else "▼" }} {{ "%.2f"|format(bank_data.change|abs) }}%
+                    </span>
+                </div>
+                <div class="index-details">
+                    H: ₹{{ "%.2f"|format(bank_data.high) }} | L: ₹{{ "%.2f"|format(bank_data.low) }}
+                </div>
+                {% else %}
+                <div class="error">Unable to fetch data</div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="sector-form">
+            <div class="search-group">
+                <select id="sectorSelect">
+                    <option value="">Select a Sector</option>
+                    {% for sector in sectors %}
+                    <option value="{{ sector }}">{{ sector }}</option>
+                    {% endfor %}
+                </select>
+                <button onclick="getSectorPrices()">Get Prices</button>
+            </div>
+            <div class="search-group">
+                <select id="indexSelect">
+                    <option value="">Select an Index</option>
+                    {% for index in indices %}
+                    <option value="{{ index }}">{{ index }}</option>
+                    {% endfor %}
+                </select>
+                <button onclick="getIndexPrice()">Get Index</button>
+            </div>
+        </div>
+        <div id="result"></div>
+    </div>
+
+    <!-- Add new divergence screen -->
+    <div id="divergenceScreen" class="filter-screen">
+        <div class="filter-content">
+            <button class="close-button" onclick="hideDivergence()">&times;</button>
+            <h2>Trading Opportunities</h2>
+            <p class="filter-description">
+                Find stocks that are moving against the market trend:
+                <ul>
+                    <li>When Nifty 50 moves up by your specified percentage</li>
+                    <li>And stocks move down by your specified percentage</li>
+                </ul>
+            </p>
+            <div class="divergence-form">
+                <div class="filter-group">
+                    <label>Nifty 50 Up By (%)</label>
+                    <input type="number" 
+                           id="niftyPercent" 
+                           class="search-input" 
+                           value="0.75" 
+                           step="0.05" 
+                           min="0">
+                </div>
+                <div class="filter-group">
+                    <label>Stocks Down By (%)</label>
+                    <input type="number" 
+                           id="stockPercent" 
+                           class="search-input" 
+                           value="0.75" 
+                           step="0.05" 
+                           min="0">
+                </div>
+                <button onclick="getDivergenceStocks()">Find Stocks</button>
+            </div>
+            <div id="divergenceResult"></div>
+        </div>
+    </div>
+
+    <script>
+        function formatNumber(num) {
+            return new Intl.NumberFormat('en-IN').format(num);
+        }
+
+        function getSectorPrices() {
+            const sector = document.getElementById('sectorSelect').value;
+            const resultDiv = document.getElementById('result');
+            
+            if (!sector) {
+                resultDiv.innerHTML = '<p class="error">Please select a sector</p>';
+                return;
+            }
+
+            resultDiv.innerHTML = '<div class="loading">Loading stock data...</div>';
+
+            fetch('/get_sector_prices', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `sector=${encodeURIComponent(sector)}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    let html = `<h2>${sector} Stocks</h2>`;
+                    data.stocks.forEach(stock => {
+                        const changeClass = stock.change >= 0 ? 'positive-change' : 'negative-change';
+                        const changeSymbol = stock.change >= 0 ? '▲' : '▼';
+                        html += `
+                            <div class="stock-card">
+                                <div class="stock-info">
+                                    <h3>${stock.company} (${stock.symbol})</h3>
+                                </div>
+                                <div class="stock-details">
+                                    <div class="price-container">
+                                        <div class="price">₹${stock.price.toFixed(2)}</div>
+                                        <div class="day-range">H: ₹${stock.dayHigh.toFixed(2)} | L: ₹${stock.dayLow.toFixed(2)}</div>
+                                    </div>
+                                    <div class="${changeClass}">${changeSymbol} ${Math.abs(stock.change).toFixed(2)}%</div>
+                                    <div class="volume">Vol: ${formatNumber(stock.volume)}</div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    resultDiv.innerHTML = html;
+                } else {
+                    resultDiv.innerHTML = `<p class="error">Error: ${data.error}</p>`;
+                }
+            })
+            .catch(error => {
+                resultDiv.innerHTML = `<p class="error">Error: ${error.message}</p>`;
+            });
+        }
+
+        function getIndexPrice() {
+            const index = document.getElementById('indexSelect').value;
+            const resultDiv = document.getElementById('result');
+            
+            if (!index) {
+                resultDiv.innerHTML = '<p class="error">Please select an index</p>';
+                return;
+            }
+
+            resultDiv.innerHTML = '<div class="loading">Loading index data...</div>';
+
+            fetch('/get_index_price', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `index=${encodeURIComponent(index)}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const index = data.index;
+                    const changeClass = index.change >= 0 ? 'positive-change' : 'negative-change';
+                    const changeSymbol = index.change >= 0 ? '▲' : '▼';
+                    const html = `
+                        <h2>${index.name}</h2>
+                        <div class="stock-card">
+                            <div class="stock-info">
+                                <h3>${index.name} Index</h3>
+                            </div>
+                            <div class="stock-details">
+                                <div class="price-container">
+                                    <div class="price">₹${index.price.toFixed(2)}</div>
+                                    <div class="day-range">H: ₹${index.high.toFixed(2)} | L: ₹${index.low.toFixed(2)}</div>
+                                </div>
+                                <div class="${changeClass}">${changeSymbol} ${Math.abs(index.change).toFixed(2)}%</div>
+                                <div class="volume">Vol: ${formatNumber(index.volume)}</div>
+                            </div>
+                        </div>
+                    `;
+                    resultDiv.innerHTML = html;
+                } else {
+                    resultDiv.innerHTML = `<p class="error">Error: ${data.error}</p>`;
+                }
+            })
+            .catch(error => {
+                resultDiv.innerHTML = `<p class="error">Error: ${error.message}</p>`;
+            });
+        }
+
+        function showFilter() {
+            document.getElementById('filterScreen').style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function hideFilter() {
+            document.getElementById('filterScreen').style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+
+        function getDetailedStock() {
+            const symbol = document.getElementById('filterStock').value.trim();
+            const resultDiv = document.getElementById('filterResult');
+            
+            if (!symbol) {
+                resultDiv.innerHTML = '<p class="error">Please enter a stock symbol</p>';
+                return;
+            }
+
+            resultDiv.innerHTML = '<div class="loading">Fetching detailed stock information...</div>';
+
+            fetch('/get_stock_price', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `symbol=${encodeURIComponent(symbol)}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const stock = data.stock;
+                    const changeClass = stock.change >= 0 ? 'positive-change' : 'negative-change';
+                    const changeSymbol = stock.change >= 0 ? '▲' : '▼';
+                    const html = `
+                        <table class="stock-details-table">
+                            <tr>
+                                <th>Company Name</th>
+                                <td>${stock.company}</td>
+                            </tr>
+                            <tr>
+                                <th>Symbol</th>
+                                <td>${stock.symbol}</td>
+                            </tr>
+                            <tr>
+                                <th>Sector</th>
+                                <td>${stock.sector || 'N/A'}</td>
+                            </tr>
+                            <tr>
+                                <th>Current Price</th>
+                                <td>₹${stock.price.toFixed(2)}</td>
+                            </tr>
+                            <tr>
+                                <th>Day's Change</th>
+                                <td class="${changeClass}">
+                                    ${changeSymbol} ${Math.abs(stock.change).toFixed(2)}%
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Day's High</th>
+                                <td>₹${stock.dayHigh.toFixed(2)}</td>
+                            </tr>
+                            <tr>
+                                <th>Day's Low</th>
+                                <td>₹${stock.dayLow.toFixed(2)}</td>
+                            </tr>
+                            <tr>
+                                <th>Volume</th>
+                                <td>${formatNumber(stock.volume)}</td>
+                            </tr>
+                        </table>
+                    `;
+                    resultDiv.innerHTML = html;
+                } else {
+                    resultDiv.innerHTML = `<p class="error">Error: ${data.error}</p>`;
+                }
+            })
+            .catch(error => {
+                resultDiv.innerHTML = `<p class="error">Error: ${error.message}</p>`;
+            });
+        }
+
+        function showSuggestions(input, suggestionsDivId) {
+            const query = input.value.trim();
+            const suggestionsDiv = document.getElementById(suggestionsDivId);
+            
+            if (query.length < 2) {
+                suggestionsDiv.style.display = 'none';
+                return;
+            }
+
+            fetch('/get_suggestions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `query=${encodeURIComponent(query)}`
+            })
+            .then(response => response.json())
+            .then(suggestions => {
+                if (suggestions.length > 0) {
+                    const html = suggestions.map(item => `
+                        <div class="suggestion-item" onclick="selectStock('${item.symbol}', '${suggestionsDivId}')">
+                            <div class="suggestion-symbol">${item.symbol}</div>
+                            <div class="suggestion-name">${item.name}</div>
+                        </div>
+                    `).join('');
+                    
+                    suggestionsDiv.innerHTML = html;
+                    suggestionsDiv.style.display = 'block';
+                } else {
+                    suggestionsDiv.style.display = 'none';
+                }
+            });
+        }
+
+        function selectStock(symbol, suggestionsDivId) {
+            const isMainSearch = suggestionsDivId === 'mainSuggestions';
+            const inputId = isMainSearch ? 'stockSearch' : 'filterStock';
+            
+            document.getElementById(inputId).value = symbol;
+            document.getElementById(suggestionsDivId).style.display = 'none';
+            
+            if (isMainSearch) {
+                searchStock();
+            } else {
+                getDetailedStock();
+            }
+        }
+
+        // Add click outside to close suggestions
+        document.addEventListener('click', function(event) {
+            const mainSuggestions = document.getElementById('mainSuggestions');
+            const filterSuggestions = document.getElementById('filterSuggestions');
+            const stockSearch = document.getElementById('stockSearch');
+            const filterStock = document.getElementById('filterStock');
+            
+            if (!event.target.closest('.suggestions-container')) {
+                mainSuggestions.style.display = 'none';
+                filterSuggestions.style.display = 'none';
+            }
+        });
+
+        function showDivergence() {
+            document.getElementById('divergenceScreen').style.display = 'block';
+            document.body.style.overflow = 'hidden';
+            getDivergenceStocks();
+        }
+
+        function hideDivergence() {
+            document.getElementById('divergenceScreen').style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+
+        function getDivergenceStocks() {
+            const resultDiv = document.getElementById('divergenceResult');
+            const niftyPercent = parseFloat(document.getElementById('niftyPercent').value);
+            const stockPercent = parseFloat(document.getElementById('stockPercent').value);
+            
+            if (isNaN(niftyPercent) || isNaN(stockPercent)) {
+                resultDiv.innerHTML = '<p class="error">Please enter valid percentages</p>';
+                return;
+            }
+
+            resultDiv.innerHTML = '<div class="loading">Finding trading opportunities...</div>';
+
+            fetch('/get_divergence_stocks', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `niftyPercent=${niftyPercent}&stockPercent=${stockPercent}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    if (data.stocks.length === 0) {
+                        resultDiv.innerHTML = `<p class="error">${data.message || 'No stocks match the criteria currently.'}</p>`;
+                        return;
+                    }
+
+                    const nifty = data.nifty;
+                    let html = `
+                        <h2>Trading Opportunities</h2>
+                        <div class="divergence-header">
+                            <div class="divergence-stats">
+                                <div class="stat-item">
+                                    <span class="stat-label">Nifty 50 Open</span>
+                                    <span class="stat-value">₹${nifty.open.toFixed(2)}</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Nifty 50 Current</span>
+                                    <span class="stat-value">₹${nifty.current.toFixed(2)}</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Nifty 50 Change</span>
+                                    <span class="stat-value positive-change">▲ ${nifty.change.toFixed(2)}%</span>
+                                </div>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Stocks Found</span>
+                                <span class="stat-value">${data.stocks.length}</span>
+                            </div>
+                        </div>`;
+
+                    data.stocks.forEach(stock => {
+                        html += `
+                            <div class="stock-card">
+                                <div class="stock-info">
+                                    <h3>${stock.symbol}</h3>
+                                    <div>${stock.company}</div>
+                                    <div class="text-secondary">Sector: ${stock.sector}</div>
+                                </div>
+                                <div class="stock-details">
+                                    <div class="price-container">
+                                        <div class="price">₹${stock.current.toFixed(2)}</div>
+                                        <div class="day-range">Open: ₹${stock.open.toFixed(2)}</div>
+                                    </div>
+                                    <div class="negative-change">▼ ${Math.abs(stock.change).toFixed(2)}%</div>
+                                    <div class="volume">Vol: ${formatNumber(stock.volume)}</div>
+                                </div>
+                            </div>`;
+                    });
+                    
+                    resultDiv.innerHTML = html;
+                } else {
+                    resultDiv.innerHTML = `<p class="error">Error: ${data.error}</p>`;
+                }
+            })
+            .catch(error => {
+                resultDiv.innerHTML = `<p class="error">Error: ${error.message}</p>`;
+            });
+        }
+    </script>
+</body>
+</html> 
