@@ -11,8 +11,7 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
-# Configure Flask app
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'fallback-secret-key')
+# Remove the SECRET_KEY configuration since it's not needed
 app.config['DEBUG'] = os.getenv('DEBUG', 'False').lower() == 'true'
 
 # Dictionary of Nifty 200 stocks grouped by sectors
